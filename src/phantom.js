@@ -77,7 +77,7 @@ export default class Phantom {
                     emitter.emit.apply(emitter, [event.type].concat(event.args));
                 }
             } else {
-                logger.info(message);
+                logger.debug(message);
             }
         });
 
