@@ -14,6 +14,8 @@ describe('Page', () => {
                 response.end('window.fooBar = 2;');
             } else if (request.url === '/test.html') {
                 response.end('<html><head><title>Page Title</title></head><body>Test</body></html>');
+            } else if (request.url === '/upload.html') {
+                response.end('<html><head><title>Page Title</title></head><body><input type="file" id="upload" /></body></html>');
             } else {
                 response.end('hi, ' + request.url);
             }
@@ -138,6 +140,26 @@ describe('Page', () => {
             return 'Value is null: ' + (arg === null);
         }, null);
         expect(response).toEqual('Value is null: true');
+    });
+
+    it('#evaluateAsync(function(){...}) executes correctly', function*() {
+        let page = yield phantom.createPage();
+        yield page.on('onCallback', function (response) {
+            expect(response).toEqual('test');
+        });
+        yield page.evaluateAsync(function () {
+            window.callPhantom('test');
+        });
+    });
+
+    it('#evaluateAsync(function(){...}) executes correctly with a delay and a non-null argument', function*() {
+        let page = yield phantom.createPage();
+        yield page.on('onCallback', function (response) {
+            expect(response).toEqual('testarg');
+        });
+        yield page.evaluateAsync(function (arg) {
+            window.callPhantom('test' + arg);
+        }, 0, 'arg');
     });
 
     it('#evaluateJavaScript(\'function(){return document.title}\') executes correctly', function*() {
@@ -512,7 +534,7 @@ describe('Page', () => {
         let reloaded = false;
 
         yield page.open('http://localhost:8888/test');
-        yield page.on('onNavigationRequested', function(url, type) {
+        yield page.on('onNavigationRequested', function (url, type) {
             if (type === 'Reload') {
                 reloaded = true;
             }
@@ -554,16 +576,16 @@ describe('Page', () => {
 
     it('#defineMethod(name, definition) defines a method', function*() {
         let page = yield phantom.createPage();
-        yield page.defineMethod('getZoomFactor', function() {
+        yield page.defineMethod('getZoomFactor', function () {
             return this.zoomFactor; // eslint-disable-line no-invalid-this
         });
         let zoomFactor = yield page.invokeMethod('getZoomFactor');
         expect(zoomFactor).toEqual(1);
     });
 
-    it('#openUrl() opens a URL', function(done) {
-        phantom.createPage().then(function(page) {
-            page.on('onLoadFinished', false, function(status) {
+    it('#openUrl() opens a URL', function (done) {
+        phantom.createPage().then(function (page) {
+            page.on('onLoadFinished', false, function (status) {
                 expect(status).toEqual('success');
                 done();
             });
@@ -579,18 +601,47 @@ describe('Page', () => {
         expect(text).toEqual('hi, http://phantomjs.org/');
     });
 
-    it('#goBack()', function(done) {
+    it('this.property = something shows a warning', function*() {
+        if (typeof Proxy === 'function') {
+            let logger = jasmine.createSpyObj('logger', ['debug', 'info', 'warn', 'error']);
+
+            let pp = new Phantom([], {logger});
+            let page = yield pp.createPage();
+
+            try {
+                page.foo = 'test';
+            } catch (e) {
+                expect(e).toEqual(jasmine.any(TypeError));
+            } finally {
+                expect(logger.warn).toHaveBeenCalledWith(jasmine.any(String));
+                pp.exit();
+            }
+        }
+    });
+
+    it('#goBack()', function (done) {
         let page;
-        phantom.createPage().then(function(instance) {
+        phantom.createPage().then(function (instance) {
             page = instance;
             return page.open('http://localhost:8888/test1');
-        }).then(function() {
+        }).then(function () {
             return page.open('http://localhost:8888/test2')
-        }).then(function() {
-            page.on('onNavigationRequested', false, function() {
+        }).then(function () {
+            page.on('onNavigationRequested', false, function () {
                 done();
             });
             return page.goBack();
         });
     });
+
+    it('#uploadFile() inserts file into file input field', function*() {
+        let page = yield phantom.createPage();
+        yield page.open('http://localhost:8888/upload.html');
+        yield page.uploadFile('#upload', process.env.PWD + '/package.json');
+        let response = yield page.evaluate(function () {
+            return document.querySelector("#upload").files[0].name;
+        });
+        expect(response).toEqual('package.json');
+    });
+
 });

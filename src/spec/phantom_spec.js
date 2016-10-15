@@ -66,16 +66,38 @@ describe('Phantom', () => {
         pp.exit();
     });
 
+    it('#create([], {logger: logger}) to log messages', () => {
+        let logger = jasmine.createSpyObj('logger', ['debug', 'info', 'warn', 'error']);
+
+        let pp = new Phantom([], {logger});
+        expect(logger.debug).toHaveBeenCalledWith(jasmine.any(String));
+        pp.exit();
+    });
+
+    it('#create([], {logLevel: \'debug\'}) change logLevel', () => {
+        const logLevel = 'error';
+
+        let pp = new Phantom([], {logLevel});
+        expect(pp.logger.transports.console.level).toEqual(logLevel);
+        pp.exit();
+    });
+
+    it('#create([], {logLevel: \'debug\'}) should not change other log levels', () => {
+        const logLevel = 'error';
+        let p1 = new Phantom([], {logLevel});
+        p1.exit();
+
+        let p2 = new Phantom();
+        expect(p2.logger.transports.console.level).toEqual('info');
+        p2.exit();
+    });
+
     it('#create("--ignore-ssl-errors=yes") to throw an exception', () => {
         expect(() => new Phantom('--ignore-ssl-errors=yes')).toThrow();
     });
 
     it('#create(true) to throw an exception', () => {
         expect(() => new Phantom(true)).toThrow();
-    });
-
-    it('#create([], "/path/to/phantomjs") to throw an exception', () => {
-        expect(() => new Phantom([], "/path/to/phantomjs")).toThrow();
     });
 
     it('catches errors when stdin closes unexpectedly', (done) => {
